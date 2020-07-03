@@ -5,6 +5,7 @@ import {
   useEffect,
   useRef,
   useCallback,
+  useMemo,
 } from "https://unpkg.com/htm/preact/standalone.module.js";
 import AudioRecorder from "https://cdn.jsdelivr.net/npm/audio-recorder-polyfill/index.js";
 
@@ -34,10 +35,33 @@ function App() {
   `;
 }
 
+class Resource {
+  constructor(_open) {
+    this._open = _open;
+  }
+
+  open() {
+    this.close();
+    this._close = this._open();
+
+    return this._close;
+  }
+
+  close() {
+    this._close?.();
+    this._close = undefined;
+  }
+}
+
 function Recorder() {
   const [src, setSrc] = useState(null);
 
   const [recorder, init] = useAudioRecorder();
+  const resource = useMemo(() => new Resource(() => init({ audio: true })), [
+    init,
+  ]);
+  useEffect(() => resource.open(), [resource]);
+
   const start = () => {
     URL.revokeObjectURL(src);
     setSrc(null);
@@ -46,8 +70,6 @@ function Recorder() {
   const stop = () => {
     recorder?.stop();
   };
-
-  useEffect(() => init({ audio: true }), [init]);
 
   const chunks$ = useRef([]);
   useEffect(() => {
