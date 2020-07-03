@@ -4,6 +4,7 @@ import {
   useState,
   useEffect,
   useRef,
+  useCallback,
 } from "https://unpkg.com/htm/preact/standalone.module.js";
 import AudioRecorder from "https://cdn.jsdelivr.net/npm/audio-recorder-polyfill/index.js";
 
@@ -12,14 +13,40 @@ if (!window.MediaRecorder) {
 }
 
 function App() {
-  const recorder = useAudioRecorder();
+  const [active, setActive] = useState(false);
+  const init = () => {
+    setActive(true);
+  };
+  const tearDown = () => {
+    setActive(false);
+  };
+
+  return html`
+    <h1>HELLO</h1>
+    <p>MediaRecorder の実験</p>
+
+    <p>
+      <button type="button" onClick=${init}>Init</button>
+      <button type="button" onClick=${tearDown}>Tear down</button>
+    </p>
+
+    ${active && html`<${Recorder} />`}
+  `;
+}
+
+function Recorder() {
+  const [src, setSrc] = useState(null);
+
+  const [recorder, init] = useAudioRecorder();
   const start = () => {
-    recorder?.start(100);
     setSrc(null);
+    recorder?.start(100);
   };
   const stop = () => {
     recorder?.stop();
   };
+
+  useEffect(() => init({ audio: true }), [init]);
 
   const chunks$ = useRef([]);
   useEffect(() => {
@@ -45,35 +72,40 @@ function App() {
     };
   }, [recorder]);
 
-  const [src, setSrc] = useState(null);
-
   return html`
-    <h1>HELLO</h1>
-    <p>MediaRecorder の実験</p>
+    <div>
+      <h2>Recorder</h2>
 
-    <button type="button" onClick=${start}>Start recording</button>
-    <button type="button" onClick=${stop}>Stop recording</button>
+      <p>
+        <button type="button" onClick=${start}>Start recording</button>
+        <button type="button" onClick=${stop}>Stop recording</button>
+      </p>
 
-    ${src &&
-    html`
-      <p>Recorded!</p>
-      <audio src=${src} controls></audio>
-    `}
+      ${src &&
+      html`
+        <p>Recorded!</p>
+        <audio src=${src} controls></audio>
+      `}
+    </div>
   `;
 }
 
 function useAudioRecorder() {
   const [recorder, setRecorder] = useState(null);
 
-  useEffect(() => {
-    navigator.mediaDevices
-      .getUserMedia({ audio: true })
-      .then(async (stream) => {
-        setRecorder(new MediaRecorder(stream));
-      });
+  const getUserMedia = useCallback((constraints) => {
+    const recorder$ = navigator.mediaDevices
+      .getUserMedia(constraints)
+      .then((stream) => new MediaRecorder(stream));
+
+    recorder$.then(setRecorder);
+
+    return async () => {
+      (await recorder$)?.stream.getTracks().forEach((t) => t.stop());
+    };
   }, []);
 
-  return recorder;
+  return [recorder, getUserMedia];
 }
 
 render(html`<${App} />`, document.getElementById("root"));
