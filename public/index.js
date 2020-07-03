@@ -40,9 +40,9 @@ class Resource {
     this._open = _open;
   }
 
-  open() {
+  open(...args) {
     this.close();
-    this._close = this._open();
+    this._close = this._open(...args);
 
     return this._close;
   }
@@ -57,10 +57,8 @@ function Recorder() {
   const [src, setSrc] = useState(null);
 
   const [recorder, init] = useAudioRecorder();
-  const resource = useMemo(() => new Resource(() => init({ audio: true })), [
-    init,
-  ]);
-  useEffect(() => resource.open(), [resource]);
+  const resource = useMemo(() => new Resource(init), [init]);
+  useEffect(() => resource.open({ audio: true }), [resource]);
 
   const start = () => {
     URL.revokeObjectURL(src);
