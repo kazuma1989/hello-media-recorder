@@ -3,6 +3,7 @@ import {
   render,
   useState,
   useEffect,
+  useRef,
 } from "https://unpkg.com/htm/preact/standalone.module.js";
 import AudioRecorder from "https://cdn.jsdelivr.net/npm/audio-recorder-polyfill/index.js";
 
@@ -13,23 +14,35 @@ if (!window.MediaRecorder) {
 function App() {
   const recorder = useAudioRecorder();
   const start = () => {
-    recorder?.start();
+    recorder?.start(100);
     setSrc(null);
   };
   const stop = () => {
     recorder?.stop();
   };
 
+  const chunks$ = useRef([]);
   useEffect(() => {
     if (!recorder) return;
 
     const onDataAvailable = (e) => {
       console.count(onDataAvailable.name);
-      setSrc(URL.createObjectURL(e.data));
-    };
 
+      chunks$.current.push(e.data);
+    };
     recorder.addEventListener("dataavailable", onDataAvailable);
-    return () => recorder.removeEventListener("dataavailable", onDataAvailable);
+
+    const onStop = () => {
+      console.count(onStop.name);
+
+      setSrc(URL.createObjectURL(new Blob(chunks$.current)));
+    };
+    recorder.addEventListener("stop", onStop);
+
+    return () => {
+      recorder.removeEventListener("dataavailable", onDataAvailable);
+      recorder.removeEventListener("stop", onStop);
+    };
   }, [recorder]);
 
   const [src, setSrc] = useState(null);
