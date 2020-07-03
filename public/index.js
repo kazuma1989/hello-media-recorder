@@ -1,3 +1,5 @@
+// @ts-check
+
 import {
   html,
   render,
@@ -14,11 +16,19 @@ if (!window.MediaRecorder) {
 }
 
 function App() {
+  const [recorder, _init] = useAudioRecorder();
+  const resource = useMemo(() => new Resource(() => _init({ audio: true })), [
+    _init,
+  ]);
+  useEffect(() => resource.close.bind(resource), [resource]);
+
   const [active, setActive] = useState(false);
   const init = () => {
+    resource.open();
     setActive(true);
   };
   const tearDown = () => {
+    resource.close();
     setActive(false);
   };
 
@@ -31,7 +41,7 @@ function App() {
       <button type="button" onClick=${tearDown}>Tear down</button>
     </p>
 
-    ${active && html`<${Recorder} />`}
+    <${Recorder} recorder=${recorder} active=${active} />
   `;
 }
 
@@ -53,19 +63,18 @@ class Resource {
   }
 }
 
-function Recorder() {
+function Recorder({ recorder, active }) {
   const [src, setSrc] = useState(null);
-
-  const [recorder, init] = useAudioRecorder();
-  const resource = useMemo(() => new Resource(init), [init]);
-  useEffect(() => resource.open({ audio: true }), [resource]);
+  const [status, setStatus] = useState("INITIAL");
 
   const start = () => {
     URL.revokeObjectURL(src);
     setSrc(null);
+    setStatus("RECORDING");
     recorder?.start(100);
   };
   const stop = () => {
+    setStatus("STOPPED");
     recorder?.stop();
   };
 
@@ -99,8 +108,20 @@ function Recorder() {
       <h2>Recorder</h2>
 
       <p>
-        <button type="button" onClick=${start}>Start recording</button>
-        <button type="button" onClick=${stop}>Stop recording</button>
+        <button
+          type="button"
+          disabled=${!active || status === "RECORDING"}
+          onClick=${start}
+        >
+          Start recording
+        </button>
+        <button
+          type="button"
+          disabled=${!active || status !== "RECORDING"}
+          onClick=${stop}
+        >
+          Stop recording
+        </button>
       </p>
 
       ${src &&
