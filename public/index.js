@@ -39,6 +39,7 @@ function Recorder() {
 
   const [recorder, init] = useAudioRecorder();
   const start = () => {
+    URL.revokeObjectURL(src);
     setSrc(null);
     recorder?.start(100);
   };
@@ -63,6 +64,7 @@ function Recorder() {
       console.count(onStop.name);
 
       setSrc(URL.createObjectURL(new Blob(chunks$.current)));
+      chunks$.current = [];
     };
     recorder.addEventListener("stop", onStop);
 
