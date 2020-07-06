@@ -25,13 +25,50 @@ setTimeout(() => {
 }, 0);
 
 function App({ notSupported }) {
-  const polyfillEnabled = notSupported !== undefined;
-
+  const recordFull$ = useRef();
+  const recordParts$ = useRef();
   const stop$ = useRef();
   const pause$ = useRef();
 
   const [recorder, getUserMedia] = useAudioRecorder();
   useEffect(() => getUserMedia({ audio: true }), [getUserMedia]);
+
+  const [events, setEvents] = useState([]);
+  const addEvent = (e) => {
+    setEvents((events) => [...events, e]);
+  };
+  useEffect(() => {
+    if (!recorder) return;
+
+    recorder.addEventListener("start", (e) => {
+      addEvent({
+        eventName: "start",
+        state: recorder.state,
+        mimeType: recorder.mimeType,
+      });
+    });
+
+    recorder.addEventListener("stop", (e) => {
+      addEvent({
+        eventName: "stop",
+        state: recorder.state,
+      });
+    });
+
+    recorder.addEventListener("pause", (e) => {
+      addEvent({
+        eventName: "pause",
+        state: recorder.state,
+      });
+    });
+
+    recorder.addEventListener("resume", (e) => {
+      addEvent({
+        eventName: "resume",
+        state: recorder.state,
+      });
+    });
+  }, [recorder]);
 
   if (notSupported) {
     return html`
@@ -39,6 +76,38 @@ function App({ notSupported }) {
         <p>Not supported</p>
       </main>
     `;
+  }
+
+  const polyfillEnabled = notSupported !== undefined;
+
+  let recordPartsDisabled = true;
+  let recordFullDisabled = true;
+  let requestDisabled = true;
+  let resumeDisabled = true;
+  let pauseDisabled = true;
+  let stopDisabled = true;
+  if (!recorder) {
+  } else if (recorder.state === "recording") {
+    recordPartsDisabled = true;
+    recordFullDisabled = true;
+    requestDisabled = false;
+    resumeDisabled = true;
+    pauseDisabled = false;
+    stopDisabled = false;
+  } else if (recorder.state === "paused") {
+    recordPartsDisabled = true;
+    recordFullDisabled = true;
+    requestDisabled = false;
+    resumeDisabled = false;
+    pauseDisabled = true;
+    stopDisabled = false;
+  } else if (recorder.state === "inactive") {
+    recordPartsDisabled = false;
+    recordFullDisabled = false;
+    requestDisabled = true;
+    resumeDisabled = true;
+    pauseDisabled = true;
+    stopDisabled = true;
   }
 
   return html`
@@ -52,13 +121,35 @@ function App({ notSupported }) {
       </p>
 
       <div id="controls">
-        <button id="record" disabled autocomplete="off" title="Record">
+        <button
+          ref=${recordFull$}
+          id="record"
+          disabled=${recordFullDisabled}
+          autocomplete="off"
+          title="Record"
+          onClick=${() => {
+            setEvents([]);
+            recorder?.start();
+            recordFull$.current?.blur();
+          }}
+        >
           <svg viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="46"></circle>
           </svg>
         </button>
 
-        <button id="sec" disabled autocomplete="off" title="Record by 1 second">
+        <button
+          ref=${recordParts$}
+          id="sec"
+          disabled=${recordPartsDisabled}
+          autocomplete="off"
+          title="Record by 1 second"
+          onClick=${() => {
+            setEvents([]);
+            recorder?.start(1_000);
+            recordParts$.current?.blur();
+          }}
+        >
           <svg viewBox="0 0 100 100">
             <circle cx="50" cy="50" r="46"></circle>
             <text x="26" y="64" font-size="45">1s</text>
@@ -68,7 +159,7 @@ function App({ notSupported }) {
         <button
           ref=${pause$}
           id="pause"
-          disabled
+          disabled=${pauseDisabled}
           autocomplete="off"
           title="Pause"
           onClick=${() => {
@@ -82,7 +173,12 @@ function App({ notSupported }) {
           </svg>
         </button>
 
-        <button id="resume" disabled autocomplete="off" title="Resume">
+        <button
+          id="resume"
+          disabled=${resumeDisabled}
+          autocomplete="off"
+          title="Resume"
+        >
           <svg viewBox="0 0 100 100">
             <polygon points="10,10 90,50 10,90"></polygon>
           </svg>
@@ -92,7 +188,7 @@ function App({ notSupported }) {
           ref=${stop$}
           id="stop"
           autocomplete="off"
-          disabled
+          disabled=${stopDisabled}
           title="Stop"
           onClick=${() => {
             recorder.stop();
@@ -105,7 +201,12 @@ function App({ notSupported }) {
           </svg>
         </button>
 
-        <button id="request" autocomplete="off" disabled title="Request data">
+        <button
+          id="request"
+          autocomplete="off"
+          disabled=${requestDisabled}
+          title="Request data"
+        >
           <svg viewBox="0 0 100 100">
             <polygon points="10,10 90,10 50,90"></polygon>
           </svg>
@@ -128,7 +229,16 @@ function App({ notSupported }) {
         polyfill MediaRecorder.
       </div>
 
-      <ul id="list"></ul>
+      <ul id="list">
+        ${events.map(({ eventName, state, mimeType }) => {
+          return html`
+            <li>
+              <strong>${eventName}</strong>: ${state}
+              ${mimeType && `, ${mimeType}`}
+            </li>
+          `;
+        })}
+      </ul>
     </main>
   `;
 }
