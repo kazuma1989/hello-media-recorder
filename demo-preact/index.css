@@ -104,7 +104,6 @@ button:disabled text {
 }
 
 #support {
-  display: none;
   margin-top: 2rem;
   color: red;
   font-weight: bold;

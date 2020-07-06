@@ -26,52 +26,79 @@ function App({ notSupported }) {
   const addEvent = (e) => {
     setEvents((events) => [...events, e]);
   };
-  useEffect(() => {
-    if (!recorder) return;
-
-    recorder.addEventListener("dataavailable", (e) => {
-      addEvent({
-        eventName: "dataavailable",
-        dataType: e.data.type,
-        dataSize: e.data.size,
-        audioSrc: URL.createObjectURL(e.data),
-      });
+  const clearEvents = () => {
+    events.forEach(({ audioSrc }) => {
+      URL.revokeObjectURL(audioSrc);
     });
 
-    recorder.addEventListener("start", (e) => {
-      addEvent({
-        eventName: "start",
-        state: recorder.state,
-        mimeType: recorder.mimeType,
-      });
-    });
+    setEvents([]);
+  };
 
-    recorder.addEventListener("stop", (e) => {
-      addEvent({
-        eventName: "stop",
-        state: recorder.state,
-      });
-    });
+  useEffect(
+    () =>
+      addEventListener(recorder, "dataavailable", (e) => {
+        addEvent({
+          eventName: "dataavailable",
+          dataType: e.data.type,
+          dataSize: e.data.size,
+          audioSrc: URL.createObjectURL(e.data),
+        });
+      }),
+    [recorder]
+  );
 
-    recorder.addEventListener("pause", (e) => {
-      addEvent({
-        eventName: "pause",
-        state: recorder.state,
-      });
-    });
+  useEffect(
+    () =>
+      addEventListener(recorder, "start", (e) => {
+        addEvent({
+          eventName: "start",
+          state: recorder.state,
+          mimeType: recorder.mimeType,
+        });
+      }),
+    [recorder]
+  );
 
-    recorder.addEventListener("resume", (e) => {
-      addEvent({
-        eventName: "resume",
-        state: recorder.state,
-      });
-    });
-  }, [recorder]);
+  useEffect(
+    () =>
+      addEventListener(recorder, "stop", (e) => {
+        addEvent({
+          eventName: "stop",
+          state: recorder.state,
+        });
+      }),
+    [recorder]
+  );
+
+  useEffect(
+    () =>
+      addEventListener(recorder, "pause", (e) => {
+        addEvent({
+          eventName: "pause",
+          state: recorder.state,
+        });
+      }),
+    [recorder]
+  );
+
+  useEffect(
+    () =>
+      addEventListener(recorder, "resume", (e) => {
+        addEvent({
+          eventName: "resume",
+          state: recorder.state,
+        });
+      }),
+    [recorder]
+  );
 
   if (notSupported) {
     return html`
       <main>
-        <p>Not supported</p>
+        <div id="support">
+          Your browser doesn’t support MediaRecorder or WebRTC to be able to
+          polyfill MediaRecorder.
+        </div>
       </main>
     `;
   }
@@ -127,7 +154,7 @@ function App({ notSupported }) {
           onClick=${(e) => {
             e.currentTarget.blur();
 
-            setEvents([]);
+            clearEvents();
             recorder?.start();
           }}
         >
@@ -144,7 +171,7 @@ function App({ notSupported }) {
           onClick=${(e) => {
             e.currentTarget.blur();
 
-            setEvents([]);
+            clearEvents();
             recorder?.start(1_000);
           }}
         >
@@ -196,7 +223,6 @@ function App({ notSupported }) {
             e.currentTarget.blur();
 
             recorder?.stop();
-            recorder?.stream.getTracks()[0]?.stop();
           }}
         >
           <svg viewBox="0 0 100 100">
@@ -232,11 +258,6 @@ function App({ notSupported }) {
         ${["audio/webm", "audio/ogg", "audio/wav"]
           .filter((i) => MediaRecorder.isTypeSupported?.(i))
           .join(", ")}
-      </div>
-
-      <div id="support">
-        Your browser doesn’t support MediaRecorder or WebRTC to be able to
-        polyfill MediaRecorder.
       </div>
 
       <ul id="list">
@@ -282,6 +303,19 @@ function useAudioRecorder() {
   }, []);
 
   return [recorder, getUserMedia];
+}
+
+/**
+ * @param {EventTarget | undefined} target
+ * @param {*} type
+ * @param {*} callback
+ */
+function addEventListener(target, type, callback) {
+  target?.addEventListener(type, callback);
+
+  return () => {
+    target?.removeEventListener(type, callback);
+  };
 }
 
 const KB = 1 << 10;
