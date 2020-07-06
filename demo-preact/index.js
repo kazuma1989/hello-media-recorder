@@ -11,12 +11,6 @@ import {
   useMemo,
 } from "https://unpkg.com/htm/preact/standalone.module.js";
 
-const EVENTS = ["start", "stop", "pause", "resume"];
-const TYPES = ["audio/webm", "audio/ogg", "audio/wav"];
-
-const KB = 1 << 10;
-const MB = 1 << 20;
-
 setTimeout(() => {
   render(
     html`<${App} notSupported=${MediaRecorder.notSupported} />`,
@@ -25,11 +19,6 @@ setTimeout(() => {
 }, 0);
 
 function App({ notSupported }) {
-  const recordFull$ = useRef();
-  const recordParts$ = useRef();
-  const stop$ = useRef();
-  const pause$ = useRef();
-
   const [recorder, getUserMedia] = useAudioRecorder();
   useEffect(() => getUserMedia({ audio: true }), [getUserMedia]);
 
@@ -39,6 +28,15 @@ function App({ notSupported }) {
   };
   useEffect(() => {
     if (!recorder) return;
+
+    recorder.addEventListener("dataavailable", (e) => {
+      addEvent({
+        eventName: "dataavailable",
+        dataType: e.data.type,
+        dataSize: e.data.size,
+        audioSrc: URL.createObjectURL(e.data),
+      });
+    });
 
     recorder.addEventListener("start", (e) => {
       addEvent({
@@ -122,15 +120,15 @@ function App({ notSupported }) {
 
       <div id="controls">
         <button
-          ref=${recordFull$}
           id="record"
           disabled=${recordFullDisabled}
           autocomplete="off"
           title="Record"
-          onClick=${() => {
+          onClick=${(e) => {
+            e.currentTarget.blur();
+
             setEvents([]);
             recorder?.start();
-            recordFull$.current?.blur();
           }}
         >
           <svg viewBox="0 0 100 100">
@@ -139,15 +137,15 @@ function App({ notSupported }) {
         </button>
 
         <button
-          ref=${recordParts$}
           id="sec"
           disabled=${recordPartsDisabled}
           autocomplete="off"
           title="Record by 1 second"
-          onClick=${() => {
+          onClick=${(e) => {
+            e.currentTarget.blur();
+
             setEvents([]);
             recorder?.start(1_000);
-            recordParts$.current?.blur();
           }}
         >
           <svg viewBox="0 0 100 100">
@@ -157,14 +155,14 @@ function App({ notSupported }) {
         </button>
 
         <button
-          ref=${pause$}
           id="pause"
           disabled=${pauseDisabled}
           autocomplete="off"
           title="Pause"
-          onClick=${() => {
-            recorder.pause();
-            pause$.current?.blur();
+          onClick=${(e) => {
+            e.currentTarget.blur();
+
+            recorder?.pause();
           }}
         >
           <svg viewBox="0 0 100 100">
@@ -178,6 +176,11 @@ function App({ notSupported }) {
           disabled=${resumeDisabled}
           autocomplete="off"
           title="Resume"
+          onClick=${(e) => {
+            e.currentTarget.blur();
+
+            recorder?.resume();
+          }}
         >
           <svg viewBox="0 0 100 100">
             <polygon points="10,10 90,50 10,90"></polygon>
@@ -185,15 +188,15 @@ function App({ notSupported }) {
         </button>
 
         <button
-          ref=${stop$}
           id="stop"
           autocomplete="off"
           disabled=${stopDisabled}
           title="Stop"
-          onClick=${() => {
-            recorder.stop();
-            recorder.stream.getTracks()[0]?.stop();
-            stop$.current?.blur();
+          onClick=${(e) => {
+            e.currentTarget.blur();
+
+            recorder?.stop();
+            recorder?.stream.getTracks()[0]?.stop();
           }}
         >
           <svg viewBox="0 0 100 100">
@@ -206,6 +209,11 @@ function App({ notSupported }) {
           autocomplete="off"
           disabled=${requestDisabled}
           title="Request data"
+          onClick=${(e) => {
+            e.currentTarget.blur();
+
+            recorder?.requestData();
+          }}
         >
           <svg viewBox="0 0 100 100">
             <polygon points="10,10 90,10 50,90"></polygon>
@@ -221,7 +229,9 @@ function App({ notSupported }) {
 
       <div id="formats">
         Format:${" "}
-        ${TYPES.filter((i) => MediaRecorder.isTypeSupported?.(i)).join(", ")}
+        ${["audio/webm", "audio/ogg", "audio/wav"]
+          .filter((i) => MediaRecorder.isTypeSupported?.(i))
+          .join(", ")}
       </div>
 
       <div id="support">
@@ -230,14 +240,27 @@ function App({ notSupported }) {
       </div>
 
       <ul id="list">
-        ${events.map(({ eventName, state, mimeType }) => {
-          return html`
-            <li>
-              <strong>${eventName}</strong>: ${state}
-              ${mimeType && `, ${mimeType}`}
-            </li>
-          `;
-        })}
+        ${events.map(
+          ({ eventName, state, mimeType, dataType, dataSize, audioSrc }) => {
+            if (eventName === "dataavailable") {
+              return html`
+                <li>
+                  <strong>${eventName}</strong>:${" "}
+                  <span>${dataType}, ${bytes(dataSize)}</span>
+
+                  <audio controls src=${audioSrc}></audio>
+                </li>
+              `;
+            }
+
+            return html`
+              <li>
+                <strong>${eventName}</strong>:${" "}
+                <span>${state}${mimeType && `, ${mimeType}`}</span>
+              </li>
+            `;
+          }
+        )}
       </ul>
     </main>
   `;
@@ -259,4 +282,24 @@ function useAudioRecorder() {
   }, []);
 
   return [recorder, getUserMedia];
+}
+
+const KB = 1 << 10;
+const MB = 1 << 20;
+
+function bytes(value) {
+  let mag = Math.abs(value);
+
+  let unit;
+  if (mag >= MB) {
+    unit = "MB";
+    value = value / MB;
+  } else if (mag >= KB) {
+    unit = "KB";
+    value = value / KB;
+  } else {
+    unit = "B";
+  }
+
+  return value.toFixed(0).replace(/(?:\.0*|(\.[^0]+)0+)$/, "$1") + " " + unit;
 }
