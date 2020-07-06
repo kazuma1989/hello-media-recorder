@@ -11,14 +11,43 @@ import {
   useMemo,
 } from "https://unpkg.com/htm/preact/standalone.module.js";
 
-function App() {
+const EVENTS = ["start", "stop", "pause", "resume"];
+const TYPES = ["audio/webm", "audio/ogg", "audio/wav"];
+
+const KB = 1 << 10;
+const MB = 1 << 20;
+
+setTimeout(() => {
+  render(
+    html`<${App} notSupported=${MediaRecorder.notSupported} />`,
+    document.body
+  );
+}, 0);
+
+function App({ notSupported }) {
+  const polyfillEnabled = notSupported !== undefined;
+
+  const stop$ = useRef();
+  const pause$ = useRef();
+
+  const [recorder, getUserMedia] = useAudioRecorder();
+  useEffect(() => getUserMedia({ audio: true }), [getUserMedia]);
+
+  if (notSupported) {
+    return html`
+      <main>
+        <p>Not supported</p>
+      </main>
+    `;
+  }
+
   return html`
     <main>
       <p>
         <a href="https://github.com/ai/audio-recorder-polyfill"
           >Audio Recorder Polyfill</a
-        >
-        is a MediaRecorder polyfill to&nbsp;record audio in Edge and Safari. See
+        >${" "} is a MediaRecorder polyfill to record audio in Edge and Safari.
+        See${" "}
         <a href="https://ai.github.io/audio-recorder-polyfill/api">API</a>.
       </p>
 
@@ -36,7 +65,17 @@ function App() {
           </svg>
         </button>
 
-        <button id="pause" disabled autocomplete="off" title="Pause">
+        <button
+          ref=${pause$}
+          id="pause"
+          disabled
+          autocomplete="off"
+          title="Pause"
+          onClick=${() => {
+            recorder.pause();
+            pause$.current?.blur();
+          }}
+        >
           <svg viewBox="0 0 100 100">
             <rect x="14" y="10" width="25" height="80"></rect>
             <rect x="62" y="10" width="25" height="80"></rect>
@@ -49,7 +88,18 @@ function App() {
           </svg>
         </button>
 
-        <button id="stop" autocomplete="off" disabled title="Stop">
+        <button
+          ref=${stop$}
+          id="stop"
+          autocomplete="off"
+          disabled
+          title="Stop"
+          onClick=${() => {
+            recorder.stop();
+            recorder.stream.getTracks()[0]?.stop();
+            stop$.current?.blur();
+          }}
+        >
           <svg viewBox="0 0 100 100">
             <rect x="12" y="12" width="76" height="76"></rect>
           </svg>
@@ -63,10 +113,15 @@ function App() {
       </div>
 
       <div id="mode">
-        Native support, <a href="?polyfill">force polyfill</a>
+        ${polyfillEnabled
+          ? html`Polyfill is enabled`
+          : html`Native support, <a href="?polyfill">force polyfill</a>`}
       </div>
 
-      <div id="formats"></div>
+      <div id="formats">
+        Format:${" "}
+        ${TYPES.filter((i) => MediaRecorder.isTypeSupported?.(i)).join(", ")}
+      </div>
 
       <div id="support">
         Your browser doesn’t support MediaRecorder or WebRTC to be able to
@@ -78,4 +133,20 @@ function App() {
   `;
 }
 
-render(html`<${App} />`, document.body);
+function useAudioRecorder() {
+  const [recorder, setRecorder] = useState(null);
+
+  const getUserMedia = useCallback((constraints) => {
+    const recorder$ = navigator.mediaDevices
+      .getUserMedia(constraints)
+      .then((stream) => new MediaRecorder(stream));
+
+    recorder$.then(setRecorder);
+
+    return async () => {
+      (await recorder$)?.stream.getTracks().forEach((t) => t.stop());
+    };
+  }, []);
+
+  return [recorder, getUserMedia];
+}
