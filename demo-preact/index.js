@@ -1,4 +1,5 @@
 // @ts-check
+/// <reference path="./typings.d.ts" />
 
 import {
   html,
