@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Media Recorder Polyfill</title>
+    <meta content="width=device-width" name="viewport" />
+    <meta name="theme-color" content="#00e5d2" />
+
+    <link rel="stylesheet" href="./index.css" />
+
+    <script type="module">
+      (async () => {
+        if (!window.MediaRecorder || location.search.includes("polyfill")) {
+          window.MediaRecorder = (
+            await import(
+              "https://cdn.jsdelivr.net/npm/audio-recorder-polyfill/index.js"
+            )
+          ).default;
+        }
+
+        await import("./index.js");
+      })();
+    </script>
+  </head>
+
+  <body></body>
+</html>
