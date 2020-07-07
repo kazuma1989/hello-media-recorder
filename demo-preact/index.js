@@ -34,6 +34,16 @@ function App({ notSupported }) {
     setEvents([]);
   };
 
+  // 録音できたら自動再生する
+  const audioSrc = events?.find((e) => e.audioSrc)?.audioSrc;
+  useEffect(() => {
+    if (!audioSrc) return;
+
+    const audio = document.createElement("audio");
+    audio.src = audioSrc;
+    audio.play();
+  }, [audioSrc]);
+
   useEffect(
     () =>
       addEventListener(recorder, "dataavailable", (e) => {
@@ -137,6 +147,15 @@ function App({ notSupported }) {
 
   return html`
     <main>
+      <p style="margin-bottom: 1em;">
+        <a href="https://ai.github.io/audio-recorder-polyfill/"
+          >https://ai.github.io/audio-recorder-polyfill/</a
+        >${" "} の模倣。<br />
+        UI の実装は異なるものの、MediaRecorder API
+        の使い方は同じなので、録音と再生に関するバグは本家にも存在するはず。
+        本家との機能的な違いは、録音後に自動再生することくらい。
+      </p>
+
       <p>
         <a href="https://github.com/ai/audio-recorder-polyfill"
           >Audio Recorder Polyfill</a
